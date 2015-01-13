@@ -52,7 +52,7 @@ class IssueController extends Controller
 		return array(
 			array('allow',  // allow all users to perform 'index' and 'view' actions
 				'actions'=>array('index','view'),
-				'users'=>array('*'),
+				'users'=>array('@'),
 			),
 			array('allow', // allow authenticated user to perform 'create' and 'update' actions
 				'actions'=>array('create','update'),
@@ -74,8 +74,12 @@ class IssueController extends Controller
 	 */
 	public function actionView($id)
 	{
+		$issue=$this->loadModel($id);
+		$comment = $this->createComment($issue);
+
 		$this->render('view',array(
-			'model'=>$this->loadModel($id),
+			'model'=>$this->loadModel($id, true),
+			'comment' => $comment,
 		));
 	}
 
@@ -185,11 +189,22 @@ class IssueController extends Controller
 	 * @return Issue the loaded model
 	 * @throws CHttpException
 	 */
-	public function loadModel($id)
+	public function loadModel($id, $withComments=false)
 	{
-		$model=Issue::model()->findByPk($id);
+		
+
+		if($withComments)
+		{
+			$model=Issue::model()->with(
+				array( 'comments'=>array('with'=>'author')))->findbyPk($id);
+		}else{
+			$model=Issue::model()->findByPk($id);
+		}
+
+
 		if($model===null)
 			throw new CHttpException(404,'The requested page does not exist.');
+
 		return $model;
 	}
 
@@ -228,5 +243,20 @@ class IssueController extends Controller
 	public function getProject()
 	{
 		return $this->_project;
+	}
+
+	protected function createComment($issue)
+	{
+		$comment=new Comment;
+		if(isset($_POST['Comment']))
+		{
+			$comment->attributes=$_POST['Comment'];
+			if($issue->addComment($comment))
+			{
+				Yii::app()->user->setFlash('commentSubmitted',"Your comment has been added." );
+				$this->refresh();
+			}
+		}
+		return $comment;
 	}
 }
